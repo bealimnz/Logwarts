@@ -20,6 +20,8 @@ class PublishConfig:
 @dataclass(frozen=True)
 class BehaviorConfig:
     buffer_size: int = 1000
+    reconnect_interval: float = 3.0
+    drain_timeout: float = 2.0
 
 
 # ---------- Main config ----------
@@ -46,6 +48,8 @@ class LogwartsConfig:
             ),
             behavior=BehaviorConfig(
                 buffer_size=1000,
+                reconnect_interval=3.0,
+                drain_timeout=2.0,
             ),
             client_id="logwarts-client",
         )

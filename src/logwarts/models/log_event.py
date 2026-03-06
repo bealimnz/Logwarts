@@ -1,7 +1,6 @@
 import datetime
 import socket
 import os
-import platform
 from dataclasses import dataclass, field, asdict
 from typing import Any, Dict, Optional
 

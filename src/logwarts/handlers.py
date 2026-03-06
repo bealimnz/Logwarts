@@ -36,4 +36,5 @@ class MqttHandler(logging.Handler):
 
     def close(self) -> None:
         self._closed = True
+        self.publisher.request_shutdown()
         super().close()

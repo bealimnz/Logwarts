@@ -1,36 +1,47 @@
+import json
 import logging
 
-from logwarts.models.config import (
-    LogwartsConfig,
-    BrokerConfig,
-    BehaviorConfig,
-    PublishConfig
-)
-from logwarts.handlers import LogwartsMqttHandler
+from logwarts.handlers import MqttHandler
 
 
-config = LogwartsConfig(
-    broker=BrokerConfig(
-        host="broker.hivemq.com",
-        port=1883
-    ),
-    behavior=BehaviorConfig(
-        buffer_size=3,
-        flush_interval=2.0
-    ),
-    publish=PublishConfig(
-        topic="logwarts/meu_teste"
-    )
-)
+class DummyPublisher:
+    def __init__(self):
+        self.payloads = []
+        self.shutdown_requested = False
 
-handler = LogwartsMqttHandler(config)
+    def enqueue_or_publish(self, payload: str) -> None:
+        self.payloads.append(payload)
 
-logger = logging.getLogger("AppPrincipal")
-logger.setLevel(logging.INFO)
-logger.addHandler(handler)
+    def request_shutdown(self) -> None:
+        self.shutdown_requested = True
 
-for i in range(6):
-    logger.info(f"Log de teste número {i}")
 
-handler.close()
-print("Logs enviados. Verifique o broker!")
+def test_handler_emit_publishes_json_payload():
+    publisher = DummyPublisher()
+    handler = MqttHandler(publisher)
+
+    logger = logging.getLogger("test_handler_emit_publishes_json_payload")
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+
+    logger.info("log de teste")
+
+    assert len(publisher.payloads) == 1
+    data = json.loads(publisher.payloads[0])
+    assert data["message"] == "log de teste"
+    assert data["level"] == "INFO"
+    assert data["logger_name"] == "test_handler_emit_publishes_json_payload"
+
+
+def test_handler_does_not_emit_after_close():
+    publisher = DummyPublisher()
+    handler = MqttHandler(publisher)
+    handler.close()
+
+    logger = logging.getLogger("test_handler_does_not_emit_after_close")
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+
+    logger.info("nao deve publicar")
+    assert publisher.payloads == []
+    assert publisher.shutdown_requested is True
