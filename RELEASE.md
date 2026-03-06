@@ -1,68 +1,51 @@
-# Release Guide
+## Logwarts v0.1.0
 
-## Versioning Strategy (SemVer)
+Primeira release publica da biblioteca Logwarts para envio de logs Python via MQTT.
 
-Logwarts uses Semantic Versioning:
+### Highlights
+- Integracao com `logging` nativo via `MqttHandler`.
+- Transporte MQTT assincrono via `MqttPublisher`.
+- Buffer offline em memoria com flush ao reconectar.
+- Reconexao automatica configuravel.
+- Encerramento gracioso com tentativa de dreno de fila (`shutdown`).
 
-- `MAJOR`: incompatible API changes.
-- `MINOR`: backward-compatible features.
-- `PATCH`: backward-compatible fixes only.
+### Adicoes
+- Suite de testes expandida cobrindo:
+  - conversao `LogRecord -> LogEvent`
+  - serializacao e filtros no handler
+  - comportamento offline/buffer/publicacao com mock de `gmqtt.Client`
+  - teste de integracao opcional com broker local
+- Exemplos prontos:
+  - CLI publicando logs em topico MQTT
+  - FastAPI/uvicorn capturando logs do servidor
+  - configuracao com `logging.config.dictConfig`
+- Documentacao completa:
+  - objetivo, instalacao, quickstart
+  - configuracao avancada (QoS/retain/TLS)
+  - schema de payload
+  - troubleshooting
+  - decisoes de design
+- Fluxo de release e CI:
+  - changelog versionado
+  - guia de release
+  - workflows de CI e release por tag
+  - scripts de preparo/publicacao/tag
 
-Version tags must be prefixed with `v`:
+### Alteracoes tecnicas
+- `MqttHandler.close()` passou a sinalizar shutdown do publisher.
+- `BehaviorConfig` expandido com:
+  - `reconnect_interval`
+  - `drain_timeout`
+- Metadados e tarefas de build/release ajustados para Poetry.
 
-- `v1.2.3`
+### Requisitos
+- Python `>=3.12,<4.0`
 
-## Changelog Policy
-
-- Keep all upcoming changes under `## [Unreleased]` in `CHANGELOG.md`.
-- At release time:
-  - Move unreleased entries into `## [X.Y.Z] - YYYY-MM-DD`.
-  - Keep entries grouped by `Added`, `Changed`, `Fixed`, `Removed`.
-
-## Local Release Steps
-
-1. Ensure branch is up to date and tests pass.
-2. Update `CHANGELOG.md` (`Unreleased` -> new version section).
-3. Bump version:
-   - `poetry version patch` or `poetry version minor` or `poetry version major`
-4. Validate packaging:
-   - `poetry check`
-   - `poetry build`
-   - `poetry publish --dry-run --build`
-5. Commit release files and tag:
-   - `git commit -am "release: vX.Y.Z"`
-   - `git tag -a vX.Y.Z -m "Release vX.Y.Z"`
-6. Push commit and tag:
-   - `git push`
-   - `git push origin vX.Y.Z`
-
-## Publishing Targets
-
-### PyPI
-
-Configure token:
-
+### Instalacao
 ```bash
-poetry config pypi-token.pypi "$PYPI_TOKEN"
+pip install logwarts==0.1.0
 ```
 
-Publish:
-
-```bash
-poetry publish --build
-```
-
-### Internal Registry
-
-Configure repository and token:
-
-```bash
-poetry config repositories.internal "$INTERNAL_PYPI_URL"
-poetry config pypi-token.internal "$INTERNAL_PYPI_TOKEN"
-```
-
-Publish:
-
-```bash
-poetry publish --build -r internal
-```
+### Artefatos
+- Wheel: `logwarts-0.1.0-py3-none-any.whl`
+- Source distribution: `logwarts-0.1.0.tar.gz`
