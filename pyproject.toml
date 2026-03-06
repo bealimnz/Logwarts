@@ -2,10 +2,11 @@
 name = "logwarts"
 version = "0.1.0"
 description = "MQTT Logging Library"
+readme = "README.md"
 authors = [
     {name = "bealins"}
 ]
-license = {text = "MIT"}
+license = "MIT"
 requires-python = ">=3.12,<4.0"
 dependencies = [
     "gmqtt>=0.7.0",
@@ -33,3 +34,11 @@ lint = "ruff check ."
 format = "ruff format ."
 test = "pytest -v"
 post_test = "pytest --cov=src -v"
+check = "poetry check"
+build = "poetry build"
+publish_dry_run = "poetry publish --dry-run --build"
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: tests that depend on local/external services",
+]

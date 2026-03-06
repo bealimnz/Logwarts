@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pipx install poetry==2.3.2
+
+      - name: Install dependencies
+        run: poetry install --with dev
+
+      - name: Verify tag matches package version
+        run: |
+          PKG_VERSION="$(poetry version -s)"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          test "$PKG_VERSION" = "$TAG_VERSION"
+
+      - name: Run tests
+        run: poetry run pytest -q
+
+      - name: Build artifacts
+        run: poetry build
+
+      - name: Publish to PyPI
+        if: ${{ secrets.PYPI_TOKEN != '' }}
+        env:
+          POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
+        run: poetry publish --build
+
+      - name: Publish to internal registry
+        if: ${{ secrets.INTERNAL_PYPI_TOKEN != '' && vars.INTERNAL_PYPI_URL != '' }}
+        env:
+          INTERNAL_PYPI_URL: ${{ vars.INTERNAL_PYPI_URL }}
+          POETRY_PYPI_TOKEN_INTERNAL: ${{ secrets.INTERNAL_PYPI_TOKEN }}
+        run: |
+          poetry config repositories.internal "$INTERNAL_PYPI_URL"
+          poetry publish --build -r internal
