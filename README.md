@@ -1,6 +1,6 @@
 # Logwarts
 
-Logwarts e uma biblioteca para enviar eventos de `logging` do Python para um broker MQTT com fila offline em memoria e reconexao automatica.
+Logwarts é uma biblioteca para enviar eventos de `logging` do Python para um broker MQTT com fila offline em memoria e reconexao automatica.
 
 ## Objetivo
 
