@@ -1,9 +1,13 @@
 import asyncio
+import logging
+from asyncio import AbstractEventLoop
 from collections import deque
 from contextlib import suppress
 
 from gmqtt import Client as MQTTClient
 from logwarts.models.config import LogwartsConfig
+
+_logger = logging.getLogger(__name__)
 
 
 class MqttPublisher:
@@ -18,6 +22,7 @@ class MqttPublisher:
         self.config = config
         self.client = MQTTClient(config.client_id)
 
+        self._loop: AbstractEventLoop | None = None
         self._connected: bool = False
         self._closing: bool = False
         self._queue = deque(maxlen=config.behavior.buffer_size)
@@ -32,6 +37,7 @@ class MqttPublisher:
     # ========================
 
     async def connect(self) -> None:
+        self._loop = asyncio.get_running_loop()
         self._closing = False
         await self._try_connect()
 
@@ -62,6 +68,7 @@ class MqttPublisher:
     # ========================
 
     def _on_connect(self, _client, _flags, _rc, _properties):
+        self._capture_running_loop()
         self._connected = True
         self._cancel_task(self._reconnect_task)
         self._reconnect_task = None
@@ -81,21 +88,16 @@ class MqttPublisher:
         Método seguro para ser chamado por logging.Handler (síncrono).
         Nunca faz await.
         """
-        if self._closing or not self._connected:
-            self._enqueue(payload)
+        self._enqueue(payload)
+
+        if self._closing:
             return
 
-        try:
-            self.client.publish(
-                self.config.publish.topic,
-                payload,
-                qos=self.config.publish.qos,
-                retain=self.config.publish.retain,
-            )
-        except Exception:
-            self._enqueue(payload)
-            self._connected = False
-            self._start_reconnect()
+        if self._connected:
+            self._start_flush()
+            return
+
+        self._start_reconnect()
 
     # ========================
     # Internals
@@ -113,29 +115,64 @@ class MqttPublisher:
             )
         except Exception:
             self._connected = False
+            _logger.warning(
+                "Failed to connect to MQTT broker host=%s port=%s tls=%s",
+                self.config.broker.host,
+                self.config.broker.port,
+                self.config.broker.tls,
+                exc_info=True,
+            )
             if not self._closing:
                 self._start_reconnect()
 
     def _start_flush(self) -> None:
-        if self._flush_task and not self._flush_task.done():
-            return
-        self._flush_task = self._spawn_task(self._flush_queue())
+        self._run_on_loop(self._start_flush_on_loop)
 
     def _start_reconnect(self) -> None:
+        self._run_on_loop(self._start_reconnect_on_loop)
+
+    def _start_flush_on_loop(self) -> None:
+        if self._flush_task and not self._flush_task.done():
+            return
+        self._flush_task = asyncio.create_task(self._flush_queue())
+
+    def _start_reconnect_on_loop(self) -> None:
+        if self._closing:
+            return
         if self._reconnect_task and not self._reconnect_task.done():
             return
-        self._reconnect_task = self._spawn_task(self._reconnect_loop())
+        self._reconnect_task = asyncio.create_task(self._reconnect_loop())
 
-    def _spawn_task(self, coro):
-        try:
-            return asyncio.create_task(coro)
-        except RuntimeError:
-            return None
-
-    @staticmethod
-    def _cancel_task(task: asyncio.Task | None) -> None:
+    def _cancel_task(self, task: asyncio.Task | None) -> None:
         if task and not task.done():
-            task.cancel()
+            if self._in_loop_thread():
+                task.cancel()
+                return
+            if self._loop and self._loop.is_running():
+                self._loop.call_soon_threadsafe(task.cancel)
+
+    def _capture_running_loop(self) -> None:
+        try:
+            self._loop = asyncio.get_running_loop()
+        except RuntimeError:
+            pass
+
+    def _in_loop_thread(self) -> bool:
+        if self._loop is None:
+            return False
+        try:
+            return asyncio.get_running_loop() is self._loop
+        except RuntimeError:
+            return False
+
+    def _run_on_loop(self, callback) -> None:
+        self._capture_running_loop()
+        if self._loop is None or self._loop.is_closed():
+            return
+        if self._in_loop_thread():
+            callback()
+            return
+        self._loop.call_soon_threadsafe(callback)
 
     async def _reconnect_loop(self) -> None:
         while not self._closing and not self._connected:
@@ -156,6 +193,7 @@ class MqttPublisher:
                 # se falhar, devolve para a fila e sai
                 self._queue.appendleft(payload)
                 self._connected = False
+                _logger.warning("Failed to publish MQTT log payload; requeueing and scheduling reconnect", exc_info=True)
                 self._start_reconnect()
                 break
             await asyncio.sleep(0)

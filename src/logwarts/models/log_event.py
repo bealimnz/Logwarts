@@ -11,7 +11,7 @@ class LogEvent:
     message: str
     level: str
     logger_name: str
-    timestamp: str = field(default_factory=lambda: datetime.datetime.utcnow().isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
 
     host: str = field(default_factory=socket.gethostname)
     process_id: int = field(default_factory=os.getpid)
@@ -35,7 +35,7 @@ class LogEvent:
             message=record.getMessage(),
             level=record.levelname,
             logger_name=record.name,
-            timestamp=datetime.datetime.fromtimestamp(record.created).isoformat(),
+            timestamp=datetime.datetime.fromtimestamp(record.created, tz=datetime.UTC).isoformat(),
             thread_name=record.threadName,
             exception=exc_info,
             extra=getattr(record, "extra_data", {})  # Suporte a dados customizados

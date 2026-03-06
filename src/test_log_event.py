@@ -36,6 +36,7 @@ def test_from_record_maps_core_fields_and_extra_data():
     assert event.thread_name == record.threadName
     assert event.extra == {"k": "v"}
     assert event.exception is None
+    assert event.timestamp.endswith("+00:00")
 
 
 def test_from_record_formats_exception():

@@ -59,14 +59,19 @@ def test_enqueue_when_disconnected(monkeypatch):
 
 
 def test_publish_when_connected(monkeypatch):
-    monkeypatch.setattr("logwarts.mqtt.publisher.MQTTClient", FakeClient)
-    publisher = MqttPublisher(make_config())
-    publisher._connected = True
+    async def scenario():
+        monkeypatch.setattr("logwarts.mqtt.publisher.MQTTClient", FakeClient)
+        publisher = MqttPublisher(make_config())
+        publisher._connected = True
+        publisher._loop = asyncio.get_running_loop()
 
-    publisher.enqueue_or_publish("msg-online")
+        publisher.enqueue_or_publish("msg-online")
+        await asyncio.sleep(0.01)
 
-    assert list(publisher._queue) == []
-    assert publisher.client.published == [("logwarts/test", "msg-online", 1, False)]
+        assert list(publisher._queue) == []
+        assert publisher.client.published == [("logwarts/test", "msg-online", 1, False)]
+
+    asyncio.run(scenario())
 
 
 def test_queue_has_max_size(monkeypatch):
